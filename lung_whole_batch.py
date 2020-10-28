@@ -8,7 +8,6 @@ import matplotlib.cm as cmx
 from mpl_toolkits.mplot3d import Axes3D
 import os,time,subprocess,glob,re
 import pandas
-from scipy.ndimage.filters import convolve
 import argparse
 
 # characteristic cycles
@@ -99,6 +98,7 @@ def conv_channel(cycle, vol, kernel, gpu_id=0, verbose=False):
         vkernel = cp.ones(kernel.shape,dtype=np.float32)/np.prod(kernel.shape)
         volume = cp.asnumpy(convolve( cp.asarray((vol>-2048),dtype=np.float32), vkernel )[np.newaxis,:])
     else:
+        from scipy.ndimage.filters import convolve
         cycle_conv = np.stack([convolve(cycle[i],kernel) for i in range(len(cycle))])
         if verbose:
             print("normalising by local volume...")        
@@ -129,19 +129,21 @@ def volume_stat(vol,cycle_norm, th):
 
 def load_vol(fn, z_crop=None, verbose=False):
     start = time.time()
+    bn = os.path.splitext(fn)[0]
     if os.path.isfile(fn):
         volz= np.load(fn)
         vol = volz[volz.files[0]]
         if verbose:
             print("volume loaded from numpy")
-    elif os.path.isdir(fn):
-        vol = load_dicom(fn)
+    elif os.path.isdir(bn):
+        vol = load_dicom(bn)
+        print("saving the volume to npz...")
         np.savez_compressed(fn,vol=vol)
         if verbose:
             print("volume loaded from dicom and saved")
     else:
-        print("file not found. A dummy file is returned.")
-        return(np.zeros((512,512,768)))
+        print("file not found.")
+        return(None)
     if verbose:
         print ("elapsed_time:{} sec".format(time.time() - start))
     if z_crop:
@@ -151,7 +153,7 @@ def load_vol(fn, z_crop=None, verbose=False):
             vol = vol[:,:,:,z_crop[0]:z_crop[1]]
     return(vol)
 
-def load_pd(base_fn, z_crop=None, verbose=False):
+def load_pd(base_fn, vol=None, z_crop=None, verbose=False):
     pd_fn = base_fn+".npy_pd.npz"
     start = time.time()
     if os.path.isfile(pd_fn):
@@ -166,6 +168,7 @@ def load_pd(base_fn, z_crop=None, verbose=False):
         except:
             print("install cripser by pip install git+https://github.com/shizuo-kaji/CubicalRipser_3dim")
             exit()
+        print("computing PH...")
         pd = cripser.computePH(vol)
         if z_crop is None:
             np.savez_compressed(pd_fn,pd=pd)
@@ -221,7 +224,7 @@ if __name__ == '__main__':
 
     for k in range(len(names)):
         ## results will be cached under root_npy. remove files if you want to recompute.
-        print("loading... {}/{}, {}, {}".format(k,end,names[k]))
+        print("loading... {}/{}, {}, {}".format(k,len(names),names[k]))
         base_fn = os.path.join(args.datadir,names[k])
 
         vol = load_vol(base_fn+".npz")
