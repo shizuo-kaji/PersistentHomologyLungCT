@@ -9,6 +9,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import os,time,subprocess,glob,re
 import pandas
 import argparse
+import ipywidgets as ipyw
 
 # characteristic cycles
 cond = [
@@ -22,6 +23,96 @@ cond = [
 #         {'dim': 0, 'b0':-1100, 'b1':-1000, 'd0': -1020, 'd1': -970, 'l0': 30, 'l1': 5000, 'th': 40}, # emp_50
          {'name': 'emp', 'dim': 2, 'b0':-1020, 'b1':-900, 'd0': -5000, 'd1': 5000, 'l0': 20, 'l1': 90, 'th': 8.3}, # emp25_narrow   low = -1100 -- -980, 
        ]
+
+# display volumetric image
+class ImageSliceViewer3D: # originally from https://github.com/mohakpatel/ImageSliceViewer3D
+    def __init__(self, vols, figsize=(40,20), vmin=None, vmax=None, init_z=0, colour=False, cmap=None, title=None, save=None, save_exit=False):
+        self.vols = vols
+        self.save=save
+        self.title=title
+        self.save_exit=save_exit
+#        print(vols[0].shape)
+        if type(vols) is not list:
+            if(len(vols.shape)==3):
+                self.vols = [vols]
+        n = len(vols)
+        self.init_z = init_z
+        self.figsize = figsize
+        self.colour=colour
+        self.view = [1,2,3,0] if self.colour else [0,1,2]
+        self.cmap = ['gray' for i in range(len(vols))] if cmap is None else cmap*n
+        self.vmin = [np.min(vols[i]) for i in range(n)] if vmin is None else vmin*n
+        self.vmax = [np.max(vols[i]) for i in range(n)] if vmax is None else vmax*n
+        
+        if vols[0].shape[-1]>1:
+            ipyw.interact(self.view_selection, view=ipyw.RadioButtons(
+                options=['x-y','y-z', 'z-x'], value='x-y', 
+                description='Slice plane selection:', disabled=False,
+                style={'description_width': 'initial'}))
+        else:
+            self.plot_slice(0)
+            
+    def view_selection(self, view):
+        # Transpose the volume to orient according to the slice plane selection
+        if self.colour:            
+            orient = {"y-z":[2,3,1,0], "z-x":[3,1,2,0], "x-y": [1,2,3,0]}
+        else:
+            orient = {"y-z":[1,2,0], "z-x":[2,0,1], "x-y": [0,1,2]}
+            
+        self.view = orient[view]
+        maxZ = self.vols[0].shape[self.view[2]] - 1
+        
+        # Call to view a slice within the selected slice plane
+        ipyw.interact(self.plot_slice, 
+            z=ipyw.IntSlider(value=self.init_z, min=0, max=maxZ, step=1, continuous_update=False, 
+            description='Image Slice:'))
+        
+    def plot_slice(self, z):            
+        # Plot slice for the given plane and slice
+        self.fig = plt.figure(figsize=self.figsize)
+        n = len(self.vols)
+        for i in range(n):
+            ax = plt.subplot(1,n,i+1)
+            ax.axis('off')
+            if self.title is not None:
+                ax.set_title(self.title[i], fontsize=30)
+            if(self.colour and len(self.vols[i].shape)==4):
+                ax.imshow( (np.clip(self.vols[i].transpose(self.view)[:,:,z,:],self.vmin[i],self.vmax[i])-self.vmin[i])/(self.vmax[i]-self.vmin[i]) )
+            else:
+                ax.imshow( np.clip(self.vols[i].transpose(self.view)[:,:,z],self.vmin[i],self.vmax[i]),cmap=plt.get_cmap(self.cmap[i]),vmin=self.vmin[i], vmax=self.vmax[i])      
+        if self.save is not None:
+            plt.savefig(self.save)
+            if self.save_exit:
+                return
+            self.save=None
+
+
+# plot persistence diagram
+def PDView(pd,cond,bmin=-2100,bmax=1200,zmin=0,zmax=9999,save_fn=None,size=3):
+    import persim
+    import matplotlib.colors as mcolors
+
+    bluea = (mcolors.to_rgb("tab:blue") + (0.01,),)
+    orangea = (mcolors.to_rgb("tab:orange") + (0.01,),)
+    greena = (mcolors.to_rgb("tab:green") + (0.01,),)
+
+    plt.figure(figsize=(24,20))
+    
+    # select cycles to plot
+    ppd = [pd[ (pd[:,0]==d)*(zmin<=pd[:,5])*(pd[:,5]<=zmax),1:3] for d in range(3)]
+    line_style=['-','--']*len(cond)
+
+    for i,f in enumerate(cond):
+        ax = plt.subplot(1,len(cond),i+1)
+        persim.plot_diagrams(ppd[f['dim']],ax=ax,xy_range=[bmin,bmax,bmin,bmax],legend=True, size=size, labels=['$H_{}$'.format(f['dim'])])
+        ax.plot([f['b0'],f['b1']], [f['b0']+f['l0'],f['b1']+f['l0']], line_style[i], c="r")
+        ax.plot([f['b0'],f['b0']], [f['b0']+f['l0'],min(bmax-100,f['b0']+f['l1'])], line_style[i], c="r")
+        ax.plot([f['b1'],f['b1']], [f['b1']+f['l0'],min(bmax-100,f['b1']+f['l1'])], line_style[i], c="r")
+        ax.plot([f['b0'],f['b1']], [min(bmax-100,f['b0']+f['l1']),min(bmax-100,f['b1']+f['l1'])], line_style[i], c="r")
+
+    if save_fn:
+        plt.savefig(save_fn)
+    plt.show()
 
 # load dicom volume in a directory
 def load_dicom(dirname, ftype="dcm"):
@@ -60,7 +151,7 @@ def gaussian(h,sigma):
 
 def cycle_count(vol,pd,cond,h=11,sigma=1.0,gpu_id=0,conv=True, verbose=False):
     if verbose:
-        print("couting relevant cycles...")
+        print("counting relevant cycles...")
     mx,my,mz=vol.shape
     cycle = np.zeros((len(cond),mx,my,mz)).astype(np.float32)
     for c in pd:
@@ -82,6 +173,16 @@ def cycle_count(vol,pd,cond,h=11,sigma=1.0,gpu_id=0,conv=True, verbose=False):
     kernel = gaussian(h,sigma)
     return(conv_channel(cycle, vol, kernel, gpu_id, verbose=False))
 
+## slower than cupy
+def convolve_tf(vol, kernel):
+    import tensorflow as tf
+    x=tf.convert_to_tensor(vol, dtype=tf.float32)
+    x = tf.expand_dims(x, axis=-1) ## add channel dimension
+    k = tf.expand_dims(tf.expand_dims(kernel, axis=-1), axis=-1)
+#    print(x.shape, k.shape)
+    y = tf.nn.convolution(x, k, strides=1, padding="SAME")
+    return(np.squeeze(y.numpy()))
+
 def conv_channel(cycle, vol, kernel, gpu_id=0, verbose=False):
     if gpu_id >= 0:
 #        from chainer.functions import convolution_nd
@@ -90,6 +191,7 @@ def conv_channel(cycle, vol, kernel, gpu_id=0, verbose=False):
         cp.cuda.Device(gpu_id).use()
         kernel = cp.asarray(kernel)
         cycle_conv = np.stack([ cp.asnumpy(convolve(cp.asarray(cycle[i]),kernel)) for i in range(len(cycle))])
+        ## using chainer
 #        kernel = cp.asarray(kernel[np.newaxis,np.newaxis,:])
 #        cycle_conv = cp.asnumpy(convolution_nd(cp.asarray(cycle[:,np.newaxis,:]),kernel,pad=h))
         if verbose:
@@ -127,7 +229,7 @@ def volume_stat(vol,cycle_norm, th):
     stats[-1] = np.sum( (vol>-2048)*(vol<-950) ) / stats[0]
     return(stats)
 
-def load_vol(fn, z_crop=None, verbose=False):
+def load_vol(fn, z_crop=None, verbose=False, save_npz=False):
     start = time.time()
     bn = os.path.splitext(fn)[0]
     if os.path.isfile(fn):
@@ -137,12 +239,13 @@ def load_vol(fn, z_crop=None, verbose=False):
             print("volume loaded from numpy")
     elif os.path.isdir(bn):
         vol = load_dicom(bn)
-        print("saving the volume to npz...")
-        np.savez_compressed(fn,vol=vol)
+        if save_npz:
+            print("saving the volume to npz...")
+            np.savez_compressed(fn,vol=vol)
         if verbose:
-            print("volume loaded from dicom and saved")
+            print("volume loaded from dicom")
     else:
-        print("file not found.")
+        print("file {} not found.".format(fn))
         return(None)
     if verbose:
         print ("elapsed_time:{} sec".format(time.time() - start))
