@@ -116,7 +116,7 @@ def PDView(pd,cond,bmin=-2100,bmax=1200,zmin=0,zmax=9999,save_fn=None,size=3):
 
 # load dicom volume in a directory
 def load_dicom(dirname, ftype="dcm"):
-    num = lambda val : int(re.sub("\\D", "", val))
+    num = lambda val : int(re.sub("\\D", "", val+"0"))
     fns = [os.path.join(dirname,f) for f in os.listdir(dirname) if (ftype in f) ]
     fns.sort(key=num)
     images = []
