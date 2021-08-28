@@ -17,11 +17,11 @@ cond = [
 #         {'dim': 0, 'b0':-1100, 'b1':-50, 'l0': 5}, # HC
 #         {'dim': 1, 'b0':-1050, 'b1':-1030, 'l0': 15}, # HC
 #         {'dim': 0, 'b0':-1700, 'b1':-610, 'l0': 370, 'l1': 5000}, # fib_long　　low = -1300 -- -1260, high = -800 -- -610
-         {'name': 'fib25', 'dim': 0, 'b0':-1260, 'b1':-380, 'd0': -5000, 'd1': 5000, 'l0': 360, 'l1': 5000, 'th': 1}, # 
+         {'name': 'fib25', 'dim': 0, 'b0':-1260, 'b1':-380, 'd0': -5000, 'd1': 5000, 'l0': 360, 'l1': 5000, 'th': 1}, #
 #         {'name': 'fib25h1', 'dim': 1, 'b0':-800, 'b1':-300,  'd0': -5000, 'd1': 5000, 'l0': 370, 'l1': 5000, 'th':0.1,}, # low: -700
 #         {'dim': 0, 'b0':-1300, 'b1':-500, 'd0': -850, 'd1': 1000, 'l0': 360, 'l1': 5000, 'th': 0.4}, # fib_50
 #         {'dim': 0, 'b0':-1100, 'b1':-1000, 'd0': -1020, 'd1': -970, 'l0': 30, 'l1': 5000, 'th': 40}, # emp_50
-         {'name': 'emp', 'dim': 2, 'b0':-1020, 'b1':-900, 'd0': -5000, 'd1': 5000, 'l0': 20, 'l1': 90, 'th': 8.3}, # emp25_narrow   low = -1100 -- -980, 
+         {'name': 'emp', 'dim': 2, 'b0':-1020, 'b1':-900, 'd0': -5000, 'd1': 5000, 'l0': 20, 'l1': 90, 'th': 8.3}, # emp25_narrow   low = -1100 -- -980,
        ]
 
 # display volumetric image
@@ -43,31 +43,31 @@ class ImageSliceViewer3D: # originally from https://github.com/mohakpatel/ImageS
         self.cmap = ['gray' for i in range(len(vols))] if cmap is None else cmap*n
         self.vmin = [np.min(vols[i]) for i in range(n)] if vmin is None else vmin*n
         self.vmax = [np.max(vols[i]) for i in range(n)] if vmax is None else vmax*n
-        
+
         if vols[0].shape[-1]>1:
             ipyw.interact(self.view_selection, view=ipyw.RadioButtons(
-                options=['x-y','y-z', 'z-x'], value='x-y', 
+                options=['x-y','y-z', 'z-x'], value='x-y',
                 description='Slice plane selection:', disabled=False,
                 style={'description_width': 'initial'}))
         else:
             self.plot_slice(0)
-            
+
     def view_selection(self, view):
         # Transpose the volume to orient according to the slice plane selection
-        if self.colour:            
+        if self.colour:
             orient = {"y-z":[2,3,1,0], "z-x":[3,1,2,0], "x-y": [1,2,3,0]}
         else:
             orient = {"y-z":[1,2,0], "z-x":[2,0,1], "x-y": [0,1,2]}
-            
+
         self.view = orient[view]
         maxZ = self.vols[0].shape[self.view[2]] - 1
-        
+
         # Call to view a slice within the selected slice plane
-        ipyw.interact(self.plot_slice, 
-            z=ipyw.IntSlider(value=self.init_z, min=0, max=maxZ, step=1, continuous_update=False, 
+        ipyw.interact(self.plot_slice,
+            z=ipyw.IntSlider(value=self.init_z, min=0, max=maxZ, step=1, continuous_update=False,
             description='Image Slice:'))
-        
-    def plot_slice(self, z):            
+
+    def plot_slice(self, z):
         # Plot slice for the given plane and slice
         self.fig = plt.figure(figsize=self.figsize)
         n = len(self.vols)
@@ -79,7 +79,7 @@ class ImageSliceViewer3D: # originally from https://github.com/mohakpatel/ImageS
             if(self.colour and len(self.vols[i].shape)==4):
                 ax.imshow( (np.clip(self.vols[i].transpose(self.view)[:,:,z,:],self.vmin[i],self.vmax[i])-self.vmin[i])/(self.vmax[i]-self.vmin[i]) )
             else:
-                ax.imshow( np.clip(self.vols[i].transpose(self.view)[:,:,z],self.vmin[i],self.vmax[i]),cmap=plt.get_cmap(self.cmap[i]),vmin=self.vmin[i], vmax=self.vmax[i])      
+                ax.imshow( np.clip(self.vols[i].transpose(self.view)[:,:,z],self.vmin[i],self.vmax[i]),cmap=plt.get_cmap(self.cmap[i]),vmin=self.vmin[i], vmax=self.vmax[i])
         if self.save is not None:
             plt.savefig(self.save)
             if self.save_exit:
@@ -97,7 +97,7 @@ def PDView(pd,cond,bmin=-2100,bmax=1200,zmin=0,zmax=9999,save_fn=None,size=3):
     greena = (mcolors.to_rgb("tab:green") + (0.01,),)
 
     plt.figure(figsize=(24,20))
-    
+
     # select cycles to plot
     ppd = [pd[ (pd[:,0]==d)*(zmin<=pd[:,5])*(pd[:,5]<=zmax),1:3] for d in range(3)]
     line_style=['-','--']*len(cond)
@@ -195,7 +195,7 @@ def conv_channel(cycle, vol, kernel, gpu_id=0, verbose=False):
 #        kernel = cp.asarray(kernel[np.newaxis,np.newaxis,:])
 #        cycle_conv = cp.asnumpy(convolution_nd(cp.asarray(cycle[:,np.newaxis,:]),kernel,pad=h))
         if verbose:
-            print("normalising by local volume...")        
+            print("normalising by local volume...")
 #        volume = cp.asnumpy(convolution_nd( cp.asarray((vol>-2048),dtype=np.float32)[np.newaxis,np.newaxis,:], cp.ones((1,1,h,h,h),dtype=np.float32) ))[0]
         vkernel = cp.ones(kernel.shape,dtype=np.float32)/np.prod(kernel.shape)
         volume = cp.asnumpy(convolve( cp.asarray((vol>-2048),dtype=np.float32), vkernel )[np.newaxis,:])
@@ -203,13 +203,13 @@ def conv_channel(cycle, vol, kernel, gpu_id=0, verbose=False):
         from scipy.ndimage.filters import convolve
         cycle_conv = np.stack([convolve(cycle[i],kernel) for i in range(len(cycle))])
         if verbose:
-            print("normalising by local volume...")        
+            print("normalising by local volume...")
         vkernel = np.ones(kernel.shape,dtype=np.float32)/np.prod(kernel.shape)
         volume = convolve( (vol>-2048).astype(np.float32), vkernel )[np.newaxis,:]
-        
+
     # normalise by volume
     volume[:,vol<=-2048] = np.inf
-    return(cycle_conv  / volume)  
+    return(cycle_conv  / volume)
 
 def volume_stat(vol,cycle_norm, th):
     stats = np.zeros(len(cycle_norm)*4+3,dtype=np.float32)
@@ -303,18 +303,24 @@ def load_cyc(cyc_fn,z_crop=None, verbose=False, recompute={'force': False}):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='chainer implementation of pix2pix')
     parser.add_argument('--datadir', type=str, default='/home/skaji/ipf/npy/', help='data directory')
-    parser.add_argument('--index_file', type=str, default='idlist.csv', help='csv file containing the names of the volume files')
+    parser.add_argument('--index_file', type=str, default=None, help='csv file containing the names of the volume files')
     parser.add_argument('--gpu_id', type=int, default=0, help='GPU ID (-1 means CPU)')
     parser.add_argument('--output', type=str, default='total.csv', help='name of the csv file to which summary will be saved')
+    parser.add_argument('--verbose', '-v', action="store_true")
     args = parser.parse_args()
 
     print(cond)
     np.set_printoptions(precision=5,suppress=True)
-    
-    # labelling
-    dat = pandas.read_csv(args.index_file,header=0)
-    names = dat['name'].tolist()
 
+    # labelling
+    if args.index_file is not None:
+        dat = pandas.read_csv(args.index_file,header=0)
+        names = dat['name'].tolist()
+    else:
+        names = []
+        for f in os.listdir(args.datadir):
+            if os.path.isdir(os.path.join(args.datadir, f)):
+                names.append(f)
 
     ## characteristic cycle and gaussian kernel parameter
     #cycle_data_suffix, sigma, h = "_cyc200922.npz", 5.0, 25
@@ -327,12 +333,12 @@ if __name__ == '__main__':
 
     for k in range(len(names)):
         ## results will be cached under root_npy. remove files if you want to recompute.
-        print("loading... {}/{}, {}, {}".format(k,len(names),names[k]))
+        print("loading... {}/{}, {}".format(k,len(names),names[k]))
         base_fn = os.path.join(args.datadir,names[k])
 
-        vol = load_vol(base_fn+".npz")
-        pd = load_pd(base_fn)
-        recompute_data = {'vol': vol, 'pd': pd, 'cond': cond, 'h':h, 'sigma':sigma, 'gpu_id': args.gpu_id}
+        vol = load_vol(base_fn+".npz", verbose=args.verbose)
+        pd = load_pd(base_fn, vol, verbose=args.verbose)
+        recompute_data = {'vol': vol, 'pd': pd, 'cond': cond, 'h':h, 'sigma':sigma, 'gpu_id': args.gpu_id, 'force': False}
         print("Volume: ",vol.shape," PD: ",pd.shape)
         cycle_norm = load_cyc(base_fn+cycle_data_suffix,recompute=recompute_data,z_crop=None,verbose=True)
 
@@ -340,5 +346,3 @@ if __name__ == '__main__':
         print("total: ",total[k])
 
     np.savetxt(args.output,total,fmt='%.5f',delimiter=",",header="vol,fib,emp,fib_r,emp_r,fib_99,emp_99,fib%def,emp%def,HAA%,LAA%")
-
-
